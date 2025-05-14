@@ -16,8 +16,10 @@ declare(strict_types = 1);
 
 namespace Causal\Theodia\ViewHelpers;
 
+use Doctrine\DBAL\Exception;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Resource\FileReference;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
@@ -129,6 +131,7 @@ class JsonLdViewHelper extends AbstractViewHelper
     /**
      * @param array $place
      * @return array
+     * @throws Exception
      */
     protected static function getJsonLdLocation(array $place): array
     {
@@ -198,16 +201,21 @@ class JsonLdViewHelper extends AbstractViewHelper
 
         if (!empty($place['photos'])) {
             $imageFile = $place['photos'][0];
-            $baseUrl = rtrim(GeneralUtility::getIndpEnv('TYPO3_SITE_URL'), '/');
-            $image = $contentObject->getImgResource($imageFile, [
-                'maxW' => '600',
-                'maxH' => '600',
-            ])[3];
-            $data['photo'] = [
-                '@context' => 'http://schema.org',
-                '@type' => 'Photograph',
-                'image' => $baseUrl . $image,
-            ];
+            if ($imageFile instanceof FileReference) {
+                $image = $contentObject->getImgResource($imageFile->getPublicUrl(), [
+                    'maxW' => '600',
+                    'maxH' => '600',
+                ]);
+
+                if (is_array($image) && !empty($image['origFile'])) {
+                    $baseUrl = rtrim(GeneralUtility::getIndpEnv('TYPO3_SITE_URL'), '/');
+                    $data['photo'] = [
+                        '@context' => 'http://schema.org',
+                        '@type' => 'Photograph',
+                        'image' => $baseUrl . $image,
+                    ];
+                }
+            }
         }
 
         return $data;
